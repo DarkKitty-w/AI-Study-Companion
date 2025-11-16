@@ -6,7 +6,6 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC)
 ![Vite](https://img.shields.io/badge/Vite-B73BFE?logo=vite&logoColor=FFD62E)
 ![Multi AI Provider](https://img.shields.io/badge/AI-Multi--Provider-FF6B6B)
-![Hackathon Ready](https://img.shields.io/badge/Hackathon-Winner_Ready-4ECDC4)
 ![Security](https://img.shields.io/badge/Security-Encrypted-00C851)
 
 **Transform Your Study Materials into Actionable Learning Tools with AI Power**
