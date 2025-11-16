@@ -1,3 +1,5 @@
+// src/services/promptTemplates.js
+
 export const PROMPT_TEMPLATES = {
   summarize: (text) => `
 Please provide a comprehensive summary of the following text. Focus on extracting the main ideas, key points, and essential information. Format your response as follows:
@@ -20,11 +22,12 @@ ${text}
 Generate educational flashcards from the following text. Create question-answer pairs that test understanding of the main concepts, definitions, and key ideas.
 
 Requirements:
-- Create 10-15 high-quality flashcards
+- Create 10+ high-quality flashcards
 - Questions should test comprehension, not just recall
 - Answers should be accurate and informative
 - Include a mix of difficulty levels
 - Format as valid JSON
+- **Your response MUST be ONLY the valid JSON object, with no introductory text, markdown formatting, or explanations.**
 
 JSON Structure:
 {
@@ -47,12 +50,13 @@ ${text}
 Create a multiple-choice quiz based on the following text. Generate 7 questions that test deep understanding of the material.
 
 Requirements:
-- 7 questions total
+- 7+ questions total
 - 4 options per question (A, B, C, D)
 - Only one correct answer per question
 - Include explanations for answers
 - Questions should test analysis and application, not just facts
 - Format as valid JSON
+- **Your response MUST be ONLY the valid JSON object, with no introductory text, markdown formatting, or explanations.**
 
 JSON Structure:
 {
@@ -80,6 +84,7 @@ Requirements:
 - 2-3 subtopics for each main topic
 - Show relationships between concepts
 - Format as valid JSON
+- **Your response MUST be ONLY the valid JSON object, with no introductory text, markdown formatting, or explanations.**
 
 JSON Structure:
 {
@@ -114,6 +119,7 @@ Requirements:
 - Ensure definitions are accurate
 - Note confidence levels for findings
 - Format as valid JSON
+- **Your response MUST be ONLY the valid JSON object, with no introductory text, markdown formatting, or explanations.**
 
 JSON Structure:
 {

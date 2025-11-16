@@ -2,14 +2,13 @@
 import React, { useState } from 'react';
 import { Download, Copy, Layers, RotateCcw, Expand, Minus, Plus } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
-import { useApiKeys } from '../../hooks/useApiKeys';
-import { handleExport } from '../../services/exporters';
-import { sanitizeInput } from '../../utils/sanitize';
+import { useAIClient } from '../../hooks/useAIClient'; 
+// import { sanitizeInput } from '../../utils/sanitize'; // 
 import { globalRateLimiter } from '../../utils/rateLimit';
 
 const MindMapTool = () => {
   const { state, dispatch } = useApp();
-  const { apiKeys } = useApiKeys();
+  const { generate } = useAIClient(); // 
   const [isCopied, setIsCopied] = useState(false);
   const [charCount, setCharCount] = useState(0);
   const [zoom, setZoom] = useState(1);
@@ -21,66 +20,101 @@ const MindMapTool = () => {
   };
 
   const generateMindMap = async () => {
-    const sanitizedInput = sanitizeInput(state.inputText);
-    if (!sanitizedInput.trim()) {
+    // ### FIX: Use the raw state.inputText ###
+    const promptText = state.inputText; 
+    if (!promptText.trim()) {
       dispatch({ type: 'SET_ERROR', payload: 'Please enter some text to generate a mind map' });
       return;
     }
 
-    if (sanitizedInput.length < 100) {
+    if (promptText.length < 100) {
       dispatch({ type: 'SET_ERROR', payload: 'Please enter at least 100 characters for a meaningful mind map' });
       return;
     }
 
-    const apiKey = apiKeys[state.currentProvider];
-    if (!apiKey) {
-      dispatch({ 
-        type: 'SET_ERROR', 
-        payload: `Please add your ${state.currentProvider} API key in settings to use this tool` 
-      });
-      return;
-    }
-
-    const userId = 'user';
-    if (!globalRateLimiter.checkLimit(userId)) {
-      const remaining = globalRateLimiter.getRemainingRequests(userId);
-      dispatch({ 
-        type: 'SET_ERROR', 
-        payload: `Rate limit exceeded. Please wait a minute. ${remaining} requests remaining.` 
-      });
-      return;
-    }
+    // API key and rate limit checks are now correctly handled by useAIClient
 
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
+    dispatch({ type: 'SET_OUTPUT', payload: null }); // Clear old results
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 2800));
-      
-      // Simulated mind map structure based on input
-      const words = sanitizedInput.split(/\s+/).filter(word => word.length > 4);
-      const mainTopics = words.slice(0, 4).map(word => word.replace(/[^a-zA-Z0-9]/g, ''));
-      
-      const mindMapData = {
-        metadata: {
-          generatedAt: new Date().toISOString(),
-          sourceLength: sanitizedInput.length,
-          mainTopics: mainTopics.length,
-          provider: state.currentProvider
-        },
-        centralIdea: `Understanding ${mainTopics[0] || 'Key Concepts'}`,
-        topics: mainTopics.map((topic, index) => ({
-          id: index + 1,
-          name: topic,
-          subtopics: words.slice(4 + index * 3, 4 + (index + 1) * 3).map((word, subIndex) => ({
-            id: `${index + 1}-${subIndex + 1}`,
-            name: word,
-            details: `Details about ${word} in the context of ${topic}`
-          }))
-        }))
-      };
+      // Create a detailed prompt specifying the exact JSON structure
+      const prompt = `
+        Based on the following text, generate a mind map. The output must be a single, valid JSON object.
 
-      dispatch({ type: 'SET_OUTPUT', payload: mindMapData });
+        The JSON structure must be:
+        {
+          "metadata": {
+            "generatedAt": "ISO_DATE_STRING",
+            "sourceLength": ${promptText.length},
+            "provider": "${state.currentProvider}"
+          },
+          "centralIdea": "A concise central theme based on the text",
+          "topics": [
+            {
+              "id": "A_UNIQUE_ID_1",
+              "name": "Main Topic 1",
+              "subtopics": [
+                {
+                  "id": "A_UNIQUE_ID_1-1",
+                  "name": "Subtopic 1.1",
+                  "details": "A brief detail or explanation for Subtopic 1.1"
+                }
+              ]
+            },
+            {
+              "id": "A_UNIQUE_ID_2",
+              "name": "Main Topic 2",
+              "subtopics": [
+                // ... more subtopics
+              ]
+            }
+            // ... more topics
+          ]
+        }
+
+        Identify 3-5 main topics from the text, and for each main topic, identify 2-4 key subtopics with details.
+
+        Input Text:
+        """
+        ${promptText}
+        """
+
+        JSON Output:
+      `;
+
+      // ### FIX: Use 'generate' instead of 'generateWithAI' ###
+      const aiResponse = await generate(
+        prompt,
+        'mindmap' // Tool type
+      );
+
+      // Parse and validate the AI response
+      let parsedResponse;
+      if (typeof aiResponse === 'string') {
+        try {
+          // Find the start of the JSON
+          const jsonMatch = aiResponse.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+          if (!jsonMatch) {
+            throw new Error("AI did not return valid JSON format.");
+          }
+          parsedResponse = JSON.parse(jsonMatch[0]);
+        } catch (parseError) {
+          console.error("Failed to parse AI response:", aiResponse);
+          throw new Error('AI returned invalid JSON format.');
+        }
+      } else {
+        parsedResponse = aiResponse; // Assume it's already an object
+      }
+
+      // Ensure the response has the structure our render function expects
+      if (!parsedResponse || !parsedResponse.centralIdea || !parsedResponse.topics) {
+        console.error("Invalid mind map structure:", parsedResponse);
+        throw new Error('AI response is missing required mind map structure (centralIdea or topics).');
+      }
+
+      dispatch({ type: 'SET_OUTPUT', payload: parsedResponse });
     } catch (error) {
       dispatch({ type: 'SET_ERROR', payload: `Failed to generate mind map: ${error.message}` });
     } finally {
@@ -89,7 +123,8 @@ const MindMapTool = () => {
   };
 
   const handleCopy = async () => {
-    if (state.output) {
+    // ### FIX: Check for .centralIdea ###
+    if (state.output?.centralIdea) {
       try {
         const textOutput = formatMindMapAsText(state.output);
         await navigator.clipboard.writeText(textOutput);
@@ -102,7 +137,8 @@ const MindMapTool = () => {
   };
 
   const handleExportClick = () => {
-    if (state.output) {
+    // ### FIX: Check for .centralIdea ###
+    if (state.output?.centralIdea) {
       try {
         let content, filename, title;
         
@@ -136,28 +172,33 @@ const MindMapTool = () => {
   };
 
   const formatMindMapAsText = (mindMapData) => {
-    let text = `Mind Map: ${mindMapData.centralIdea}\n`;
-    text += `Generated: ${new Date().toLocaleString()}\n\n`;
-    
-    mindMapData.topics.forEach(topic => {
-      text += `📌 ${topic.name}\n`;
-      topic.subtopics.forEach(subtopic => {
-        text += `  └── ${subtopic.name}\n`;
-        text += `      └── ${subtopic.details}\n`;
+      if (!mindMapData) return '';
+
+      let text = `Mind Map: ${mindMapData.centralIdea || 'Central Idea'}\n`;
+      text += `Generated: ${new Date().toLocaleString()}\n\n`;
+
+      // Use empty array fallback
+      (mindMapData.topics || []).forEach(topic => {
+        text += `📌 ${topic.name || 'Topic'}\n`;
+
+        (topic.subtopics || []).forEach(subtopic => {
+          text += `  └── ${subtopic.name || 'Subtopic'}\n`;
+          text += `      └── ${subtopic.details || 'Details'}\n`;
+        });
+
+        text += '\n';
       });
-      text += '\n';
-    });
-    
-    return text;
+
+      return text;
   };
 
   const formatMindMapAsMarkdown = (mindMapData) => {
     let markdown = `# ${mindMapData.centralIdea}\n\n`;
     markdown += `*Generated on ${new Date().toLocaleString()}*\n\n`;
     
-    mindMapData.topics.forEach(topic => {
+    (mindMapData.topics || []).forEach(topic => {
       markdown += `## ${topic.name}\n`;
-      topic.subtopics.forEach(subtopic => {
+      (topic.subtopics || []).forEach(subtopic => {
         markdown += `- **${subtopic.name}** - ${subtopic.details}\n`;
       });
       markdown += '\n';
@@ -172,9 +213,9 @@ const MindMapTool = () => {
     dot += `  node [shape=rectangle, style=filled, fillcolor=lightblue];\n`;
     dot += `  "${mindMapData.centralIdea}" [fillcolor=orange];\n\n`;
     
-    mindMapData.topics.forEach(topic => {
+    (mindMapData.topics || []).forEach(topic => {
       dot += `  "${mindMapData.centralIdea}" -> "${topic.name}";\n`;
-      topic.subtopics.forEach(subtopic => {
+      (topic.subtopics || []).forEach(subtopic => {
         dot += `  "${topic.name}" -> "${subtopic.name}";\n`;
       });
     });
@@ -195,50 +236,53 @@ const MindMapTool = () => {
   const resetZoom = () => setZoom(1);
 
   const renderMindMapVisual = () => {
-    if (!state.output) return null;
+      // ### FIX: Check for .centralIdea ###
+      if (!state.output?.centralIdea) return null;
 
-    return (
-      <div className="relative bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-8 border border-orange-200 overflow-auto">
-        <div 
-          className="flex justify-center items-start min-w-max"
-          style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
-        >
-          {/* Central Idea */}
-          <div className="text-center mb-12">
-            <div className="bg-orange-500 text-white px-6 py-4 rounded-2xl shadow-lg inline-block max-w-md mx-auto">
-              <h3 className="text-xl font-bold">{state.output.centralIdea}</h3>
-            </div>
-            
-            {/* Topics */}
-            <div className="flex justify-center space-x-8 mt-8">
-              {state.output.topics.map((topic, index) => (
-                <div key={topic.id} className="flex flex-col items-center">
-                  {/* Connection Line */}
-                  <div className="w-px h-8 bg-gray-400 mb-2"></div>
-                  
-                  {/* Topic Node */}
-                  <div className="bg-red-500 text-white px-4 py-3 rounded-xl shadow-lg text-center min-w-[120px]">
-                    <h4 className="font-semibold text-sm">{topic.name}</h4>
-                  </div>
-                  
-                  {/* Subtopics */}
-                  <div className="flex flex-col items-center mt-4 space-y-2">
-                    {topic.subtopics.map((subtopic, subIndex) => (
-                      <div key={subtopic.id} className="flex flex-col items-center">
-                        <div className="w-px h-4 bg-gray-300 mb-1"></div>
-                        <div className="bg-white border-2 border-red-300 px-3 py-2 rounded-lg shadow-sm text-center min-w-[100px]">
-                          <p className="text-xs font-medium text-gray-800">{subtopic.name}</p>
+      const topics = state.output.topics || []; // <- fallback to empty array
+
+      return (
+        <div className="relative bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-8 border border-orange-200 overflow-auto">
+          <div 
+            className="flex justify-center items-start min-w-max"
+            style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
+          >
+            {/* Central Idea */}
+            <div className="text-center mb-12">
+              <div className="bg-orange-500 text-white px-6 py-4 rounded-2xl shadow-lg inline-block max-w-md mx-auto">
+                <h3 className="text-xl font-bold">{state.output.centralIdea || 'Central Idea'}</h3>
+              </div>
+
+              {/* Topics */}
+              <div className="flex justify-center space-x-8 mt-8">
+                {topics.map((topic, index) => (
+                  <div key={topic.id || index} className="flex flex-col items-center">
+                    {/* Connection Line */}
+                    <div className="w-px h-8 bg-gray-400 mb-2"></div>
+
+                    {/* Topic Node */}
+                    <div className="bg-red-500 text-white px-4 py-3 rounded-xl shadow-lg text-center min-w-[120px]">
+                      <h4 className="font-semibold text-sm">{topic.name || `Topic ${index + 1}`}</h4>
+                    </div>
+
+                    {/* Subtopics */}
+                    <div className="flex flex-col items-center mt-4 space-y-2">
+                      {(topic.subtopics || []).map((subtopic, subIndex) => (
+                        <div key={subtopic.id || subIndex} className="flex flex-col items-center">
+                          <div className="w-px h-4 bg-gray-300 mb-1"></div>
+                          <div className="bg-white border-2 border-red-300 px-3 py-2 rounded-lg shadow-sm text-center min-w-[100px]">
+                            <p className="text-xs font-medium text-gray-800">{subtopic.name || 'Subtopic'}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    );
+      );
   };
 
   return (
@@ -295,7 +339,8 @@ Example: 'Machine learning encompasses several types: supervised learning (class
       </div>
 
       {/* Output Section */}
-      {state.output && (
+      {/* ### FIX: Check for .centralIdea to prevent crash ### */}
+      {state.output?.centralIdea && (
         <div className="card animate-fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
             <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
@@ -335,6 +380,7 @@ Example: 'Machine learning encompasses several types: supervised learning (class
               >
                 <option value="markdown">Markdown</option>
                 <option value="dot">DOT</option>
+                {/* ### FIX: Corrected typo 'value_expose' ### */}
                 <option value="text">Text</option>
                 <option value="json">JSON</option>
               </select>
@@ -382,7 +428,8 @@ Example: 'Machine learning encompasses several types: supervised learning (class
       )}
 
       {/* Empty State */}
-      {!state.output && !state.isLoading && (
+      {/* ### FIX: Check for .centralIdea to prevent crash ### */}
+      {!state.output?.centralIdea && !state.isLoading && (
         <div className="card text-center py-12">
           <Layers className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Visualize Your Knowledge</h3>

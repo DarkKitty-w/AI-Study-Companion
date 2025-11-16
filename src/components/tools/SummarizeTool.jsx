@@ -3,13 +3,15 @@ import React, { useState } from 'react';
 import { Download, Copy, Sparkles, FileText, RotateCcw } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useApiKeys } from '../../hooks/useApiKeys';
+import { useAIClient } from '../../hooks/useAIClient'; // 
 import { handleExport } from '../../services/exporters';
-import { sanitizeInput } from '../../utils/sanitize';
+// import { sanitizeInput } from '../../utils/sanitize'; // 
 import { globalRateLimiter } from '../../utils/rateLimit';
 
 const SummarizeTool = () => {
   const { state, dispatch } = useApp();
   const { apiKeys } = useApiKeys();
+  const { generate } = useAIClient(); // 
   const [isCopied, setIsCopied] = useState(false);
   const [charCount, setCharCount] = useState(0);
 
@@ -18,20 +20,19 @@ const SummarizeTool = () => {
     setCharCount(text.length);
   };
 
+  // ### FIX: This is the new, correct function that calls the AI ###
   const handleSummarize = async () => {
-    // Input validation
-    const sanitizedInput = sanitizeInput(state.inputText);
-    if (!sanitizedInput.trim()) {
+    // 1. --- Input Validation ---
+    if (!state.inputText.trim()) {
       dispatch({ type: 'SET_ERROR', payload: 'Please enter some text to summarize' });
       return;
     }
-
-    if (sanitizedInput.length < 50) {
+    if (state.inputText.length < 50) {
       dispatch({ type: 'SET_ERROR', payload: 'Please enter at least 50 characters for meaningful summarization' });
       return;
     }
 
-    // API key check
+    // 2. --- API Key Check ---
     const apiKey = apiKeys[state.currentProvider];
     if (!apiKey) {
       dispatch({ 
@@ -41,7 +42,7 @@ const SummarizeTool = () => {
       return;
     }
 
-    // Rate limiting
+    // 3. --- Rate Limiting ---
     const userId = 'user'; // In real app, use actual user ID
     if (!globalRateLimiter.checkLimit(userId)) {
       const remaining = globalRateLimiter.getRemainingRequests(userId);
@@ -52,31 +53,38 @@ const SummarizeTool = () => {
       return;
     }
 
+    // 4. --- Set Loading State ---
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
+    dispatch({ type: 'SET_OUTPUT', payload: null }); // Clear old results
 
     try {
-      // Simulate AI processing - in real implementation, this would call the AI service
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 5. --- Call the AI Service ---
+      const aiResponse = await generate(
+        state.inputText, 
+        'summarize' // This must match promptTemplates.js
+      );
+
+      // 6. --- Validate the Response ---
+      if (typeof aiResponse !== 'string' || !aiResponse.trim()) {
+        throw new Error("AI returned an empty or invalid summary.");
+      }
       
-      // Simulated summary based on input
-      const sentences = sanitizedInput.split(/[.!?]+/).filter(s => s.trim().length > 0);
-      const summaryPoints = sentences.slice(0, 5).map(sentence => 
-        `• ${sentence.trim().replace(/^[a-z]/, c => c.toUpperCase())}`
-      ).join('\n');
-      
-      const simulatedSummary = `📝 **Summary**\n\n${summaryPoints}\n\n💡 **Key Takeaways:**\n• Generated from ${sentences.length} sentences\n• Focused on main points\n• Perfect for quick review`;
-      
-      dispatch({ type: 'SET_OUTPUT', payload: simulatedSummary });
+      // 7. --- Success: Set the output ---
+      dispatch({ type: 'SET_OUTPUT', payload: aiResponse });
+
     } catch (error) {
+      // 8. --- Handle Errors ---
+      console.error("Summary generation failed:", error);
       dispatch({ type: 'SET_ERROR', payload: `Failed to generate summary: ${error.message}` });
     } finally {
+      // 9. --- Stop Loading ---
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
   const handleCopy = async () => {
-    if (state.output) {
+    if (state.output && typeof state.output === 'string') { // 
       try {
         await navigator.clipboard.writeText(state.output);
         setIsCopied(true);
@@ -88,7 +96,7 @@ const SummarizeTool = () => {
   };
 
   const handleExportClick = () => {
-    if (state.output) {
+    if (state.output && typeof state.output === 'string') { // 
       try {
         handleExport(state.output, state.exportFormat, 'ai-study-summary', 'AI Study Companion - Summary');
       } catch (error) {
@@ -157,7 +165,8 @@ Example: 'Machine learning is a subset of artificial intelligence that enables c
       </div>
 
       {/* Output Section */}
-      {state.output && (
+      {/* ### FIX: Check if output is a string to prevent crash ### */}
+      {state.output && typeof state.output === 'string' && (
         <div className="card animate-fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
             <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
@@ -212,7 +221,8 @@ Example: 'Machine learning is a subset of artificial intelligence that enables c
       )}
 
       {/* Empty State */}
-      {!state.output && !state.isLoading && (
+      {/* ### FIX: Check if output is NOT a string (or is null) ### */}
+      {(!state.output || typeof state.output !== 'string') && !state.isLoading && (
         <div className="card text-center py-12">
           <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Ready to Summarize</h3>

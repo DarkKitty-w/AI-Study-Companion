@@ -3,58 +3,45 @@ import { useCallback } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { useApiKeys } from './useApiKeys';
 import { aiService } from '../services/aiProviders';
-import { globalRateLimiter } from '../utils/rateLimit';
 
 export function useAIClient() {
-  const { state, dispatch } = useApp();
+  const { state } = useApp();
   const { apiKeys } = useApiKeys();
 
-  const generateWithAI = useCallback(async (prompt, toolType) => {
-    // Validate input
-    if (!prompt || !prompt.trim()) {
-      throw new Error('Please enter some text to process');
-    }
+  // This hook now has ONE job:
+  // Set up the aiService and return a "generate" function
+  // for components to use.
+  
+  // All dispatch/loading/error logic is handled
+  // in the component itself (e.g., QuizTool.jsx), which is correct.
 
-    if (prompt.length < 50) {
-      throw new Error('Please enter at least 50 characters for meaningful processing');
-    }
+  const generate = useCallback(async (prompt, toolType, model = null) => {
+    
+    // 1. Get the current provider and API key
+    const provider = state.currentProvider;
+    const apiKey = apiKeys[provider];
 
-    // Check API key
-    const apiKey = apiKeys[state.currentProvider];
     if (!apiKey) {
-      throw new Error(`Please add your ${state.currentProvider} API key in settings`);
+      throw new Error(`Please add your ${provider} API key in settings`);
     }
 
-    // Rate limiting
-    const userId = 'user';
-    if (!globalRateLimiter.checkLimit(userId)) {
-      const remaining = globalRateLimiter.getRemainingRequests(userId);
-      throw new Error(`Rate limit exceeded. Please wait a minute. ${remaining} requests remaining.`);
-    }
-
-    // Set up AI client
-    if (!aiService.hasClient(state.currentProvider)) {
-      const success = aiService.setClient(state.currentProvider, apiKey);
+    // 2. Ensure the client is set up in the service
+    // (This is fast and only runs once per provider)
+    if (!aiService.hasClient(provider)) {
+      const success = aiService.setClient(provider, apiKey);
       if (!success) {
-        throw new Error(`Failed to initialize ${state.currentProvider} client. Please check your API key.`);
+        throw new Error(`Failed to initialize ${provider} client. Check your API key.`);
       }
     }
 
-    // Generate with AI
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_ERROR', payload: null });
+    // 3. Call the AI service and return the response
+    // The component will handle try/catch and loading/error states.
+    const modelToUse = model || state.models?.[provider];
+    
+    return await aiService.generate(provider, prompt, toolType, modelToUse);
 
-    try {
-      const response = await aiService.generate(state.currentProvider, prompt, toolType);
-      dispatch({ type: 'SET_OUTPUT', payload: response });
-      return response;
-    } catch (error) {
-      dispatch({ type: 'SET_ERROR', payload: error.message });
-      throw error;
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
-  }, [state.currentProvider, apiKeys, dispatch]);
+  }, [state.currentProvider, apiKeys, state.models]);
 
-  return { generateWithAI };
+  // ### FIX: Return 'generate' to match what QuizTool.jsx expects ###
+  return { generate };
 }

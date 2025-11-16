@@ -1,4 +1,4 @@
-import { sanitizeInput } from '../../utils/sanitize';
+// ### FIX: Removed sanitizeInput import as it's no longer used ###
 import { getPrompt } from '../promptTemplates';
 
 // Base AI Client
@@ -8,30 +8,71 @@ class AIClient {
     this.provider = provider;
   }
 
-  async makeRequest(endpoint, options) {
-    try {
-      const response = await fetch(endpoint, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-        ...options,
-      });
+  // Added retry logic for 503/429 errors
+  async makeRequest(endpoint, options, retries = 3) {
+    let lastError;
 
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    for (let i = 0; i < retries; i++) {
+      try {
+        const { headers: customHeaders, ...restOptions } = options;
+        const response = await fetch(endpoint, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...customHeaders,
+          },
+          ...restOptions,
+        });
+
+        if (!response.ok) {
+          // Check for retryable server errors (503 = Overloaded, 429 = Rate Limit)
+          if (response.status === 503 || response.status === 429) {
+            const delay = (2 ** i) * 1000 + Math.random() * 1000; // Exponential backoff
+            console.warn(`AI API Error (${this.provider}): Status ${response.status}. Retrying in ${delay.toFixed(0)}ms... (Attempt ${i + 1}/${retries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            lastError = new Error(`API request failed: ${response.status} ${response.statusText}`);
+            continue; // Go to the next loop iteration (retry)
+          }
+
+          // Non-retryable client/server error (e.g., 400, 401, 404)
+          const errorBody = await response.json().catch(() => ({}));
+          const errorDetails = errorBody.error?.message || response.statusText;
+          lastError = new Error(`API request failed: ${response.status} ${errorDetails}`);
+          throw lastError; // Throw, will be caught by outer catch
+        }
+
+        return await response.json(); // Success!
+
+      } catch (error) {
+        lastError = error; // Store the error
+        
+        if (error.message.startsWith('API request failed')) {
+          console.error(`AI API Error (${this.provider}):`, error);
+          throw error; // Rethrow non-retryable error
+        }
+        
+        const delay = (2 ** i) * 1000 + Math.random() * 1000;
+        console.warn(`AI API Network Error (${this.provider}): ${error.message}. Retrying in ${delay.toFixed(0)}ms... (Attempt ${i + 1}/${retries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-
-      return await response.json();
-    } catch (error) {
-      console.error(`AI API Error (${this.provider}):`, error);
-      throw new Error(`Failed to connect to ${this.provider} API: ${error.message}`);
     }
+    
+    console.error(`AI API Error (${this.provider}): All retries failed.`, lastError);
+    throw new Error(`Failed to connect to ${this.provider} API after ${retries} attempts: ${lastError.message}`);
   }
+
 
   formatPrompt(prompt, toolType) {
     return getPrompt(toolType, prompt);
   }
+}
+
+// ### Helper for OpenAI-compatible clients ###
+function handleOpenAIResponse(response, provider) {
+  if (!response.choices || response.choices.length === 0) {
+    console.error(`Invalid ${provider} response:`, response);
+    throw new Error(`${provider} AI returned an empty or invalid response.`);
+  }
+  return response.choices[0].message.content;
 }
 
 // OpenAI Implementation
@@ -42,27 +83,20 @@ export class OpenAIClient extends AIClient {
   }
 
   async generate(prompt, toolType, model = 'gpt-3.5-turbo') {
-    const formattedPrompt = this.formatPrompt(sanitizeInput(prompt), toolType);
+    // ### FIX: Removed sanitizeInput ###
+    const formattedPrompt = this.formatPrompt(prompt, toolType);
     
     const response = await this.makeRequest(this.endpoint, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-      },
+      headers: { 'Authorization': `Bearer ${this.apiKey}` },
       body: JSON.stringify({
         model: model,
-        messages: [
-          {
-            role: 'user',
-            content: formattedPrompt
-          }
-        ],
+        messages: [{ role: 'user', content: formattedPrompt }],
         temperature: 0.7,
         max_tokens: 2000
       })
     });
-
-    return response.choices[0].message.content;
+    return handleOpenAIResponse(response, this.provider);
   }
 }
 
@@ -74,27 +108,26 @@ export class AnthropicClient extends AIClient {
   }
 
   async generate(prompt, toolType, model = 'claude-3-sonnet-20240229') {
-    const formattedPrompt = this.formatPrompt(sanitizeInput(prompt), toolType);
+    // ### FIX: Removed sanitizeInput ###
+    const formattedPrompt = this.formatPrompt(prompt, toolType);
     
     const response = await this.makeRequest(this.endpoint, {
       method: 'POST',
       headers: {
         'x-api-key': this.apiKey,
         'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: model,
         max_tokens: 2000,
-        messages: [
-          {
-            role: 'user',
-            content: formattedPrompt
-          }
-        ]
+        messages: [{ role: 'user', content: formattedPrompt }]
       })
     });
 
+    if (!response.content || response.content.length === 0) {
+      console.error('Invalid Anthropic response:', response);
+      throw new Error('Anthropic AI returned an empty or invalid response.');
+    }
     return response.content[0].text;
   }
 }
@@ -103,32 +136,45 @@ export class AnthropicClient extends AIClient {
 export class GoogleAIClient extends AIClient {
   constructor(apiKey) {
     super(apiKey, 'google');
-    this.endpoint = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`;
+    this.baseEndpoint = 'https://generativelanguage.googleapis.com/v1/models';
   }
 
-  async generate(prompt, toolType) {
-    const formattedPrompt = this.formatPrompt(sanitizeInput(prompt), toolType);
+  async generate(prompt, toolType, model = 'gemini-2.5-flash') {
+    // ### FIX: Removed sanitizeInput ###
+    const formattedPrompt = this.formatPrompt(prompt, toolType);
+    const endpoint = `${this.baseEndpoint}/${model}:generateContent?key=${this.apiKey}`;
     
-    const response = await this.makeRequest(this.endpoint, {
+    const response = await this.makeRequest(endpoint, {
       method: 'POST',
       body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: formattedPrompt
-              }
-            ]
-          }
-        ],
+        contents: [{ parts: [{ text: formattedPrompt }] }],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 2000,
+          maxOutputTokens: 20000,
         }
       })
     });
 
-    return response.candidates[0].content.parts[0].text;
+    if (!response.candidates || response.candidates.length === 0) {
+      if (response.promptFeedback && response.promptFeedback.blockReason) {
+        throw new Error(`Google AI request blocked for: ${response.promptFeedback.blockReason}`);
+      }
+      console.error('Invalid Google AI response (no candidates):', response);
+      throw new Error('Google AI returned an invalid or empty response.');
+    }
+
+    const candidate = response.candidates[0];
+
+    if (candidate.finishReason !== 'STOP') {
+      throw new Error(`Google AI stopped with reason: ${candidate.finishReason}. No content generated.`);
+    }
+
+    if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+      console.error('Invalid Google AI candidate (no content):', candidate);
+      throw new Error('Google AI returned a candidate with no content.');
+    }
+
+    return candidate.content.parts[0].text;
   }
 }
 
@@ -140,27 +186,20 @@ export class GroqClient extends AIClient {
   }
 
   async generate(prompt, toolType, model = 'llama2-70b-4096') {
-    const formattedPrompt = this.formatPrompt(sanitizeInput(prompt), toolType);
+    // ### FIX: Removed sanitizeInput ###
+    const formattedPrompt = this.formatPrompt(prompt, toolType);
     
     const response = await this.makeRequest(this.endpoint, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-      },
+      headers: { 'Authorization': `Bearer ${this.apiKey}` },
       body: JSON.stringify({
         model: model,
-        messages: [
-          {
-            role: 'user',
-            content: formattedPrompt
-          }
-        ],
+        messages: [{ role: 'user', content: formattedPrompt }],
         temperature: 0.7,
         max_tokens: 2000
       })
     });
-
-    return response.choices[0].message.content;
+    return handleOpenAIResponse(response, this.provider);
   }
 }
 
@@ -172,27 +211,20 @@ export class DeepSeekClient extends AIClient {
   }
 
   async generate(prompt, toolType, model = 'deepseek-chat') {
-    const formattedPrompt = this.formatPrompt(sanitizeInput(prompt), toolType);
+    // ### FIX: Removed sanitizeInput ###
+    const formattedPrompt = this.formatPrompt(prompt, toolType);
     
     const response = await this.makeRequest(this.endpoint, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-      },
+      headers: { 'Authorization': `Bearer ${this.apiKey}` },
       body: JSON.stringify({
         model: model,
-        messages: [
-          {
-            role: 'user',
-            content: formattedPrompt
-          }
-        ],
+        messages: [{ role: 'user', content: formattedPrompt }],
         temperature: 0.7,
         max_tokens: 2000
       })
     });
-
-    return response.choices[0].message.content;
+    return handleOpenAIResponse(response, this.provider);
   }
 }
 
@@ -200,17 +232,17 @@ export class DeepSeekClient extends AIClient {
 export class HuggingFaceClient extends AIClient {
   constructor(apiKey) {
     super(apiKey, 'huggingface');
-    this.endpoint = 'https://api-inference.huggingface.co/models/microsoft/DialoGPT-large';
+    this.baseEndpoint = 'https://api-inference.huggingface.co/models';
   }
 
-  async generate(prompt, toolType) {
-    const formattedPrompt = this.formatPrompt(sanitizeInput(prompt), toolType);
+  async generate(prompt, toolType, model = 'microsoft/DialoGPT-large') {
+    // ### FIX: Removed sanitizeInput ###
+    const formattedPrompt = this.formatPrompt(prompt, toolType);
+    const endpoint = `${this.baseEndpoint}/${model}`;
     
-    const response = await this.makeRequest(this.endpoint, {
+    const response = await this.makeRequest(endpoint, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-      },
+      headers: { 'Authorization': `Bearer ${this.apiKey}` },
       body: JSON.stringify({
         inputs: formattedPrompt,
         parameters: {
@@ -220,7 +252,16 @@ export class HuggingFaceClient extends AIClient {
       })
     });
 
-    return response[0]?.generated_text || 'Response not available';
+    if (Array.isArray(response) && response[0]?.generated_text) {
+      return response[0].generated_text;
+    }
+    
+    if (response.error) {
+      throw new Error(`HuggingFace API error: ${response.error}`);
+    }
+
+    console.error('Invalid HuggingFace response:', response);
+    return 'Response not available';
   }
 }
 
@@ -267,17 +308,10 @@ export class AIService {
     }
 
     try {
-      const response = await client.generate(prompt, toolType, model);
-      
-      // Try to parse JSON responses
-      try {
-        return JSON.parse(response);
-      } catch {
-        return response;
-      }
+      return await client.generate(prompt, toolType, model);
     } catch (error) {
       console.error(`AI generation failed for ${provider}:`, error);
-      throw new Error(`AI service error: ${error.message}`);
+      throw new Error(`AI service error (${provider}): ${error.message}`);
     }
   }
 

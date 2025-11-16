@@ -3,13 +3,14 @@ import React, { useState } from 'react';
 import { Download, Copy, HelpCircle, RotateCcw, CheckCircle2, XCircle } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useApiKeys } from '../../hooks/useApiKeys';
+import { useAIClient } from '../../hooks/useAIClient'; // 
 import { handleExport } from '../../services/exporters';
-import { sanitizeInput } from '../../utils/sanitize';
 import { globalRateLimiter } from '../../utils/rateLimit';
 
 const QuizTool = () => {
   const { state, dispatch } = useApp();
-  const { apiKeys } = useApiKeys();
+  const { apiKeys } = useApiKeys(); // Keep this for API key check
+  const { generate } = useAIClient(); // Get the AI function from our hook
   const [isCopied, setIsCopied] = useState(false);
   const [charCount, setCharCount] = useState(0);
   const [quizMode, setQuizMode] = useState(false);
@@ -24,18 +25,19 @@ const QuizTool = () => {
     setCharCount(text.length);
   };
 
+  // ### FIX: This is the new, correct function that calls the AI ###
   const generateQuiz = async () => {
-    const sanitizedInput = sanitizeInput(state.inputText);
-    if (!sanitizedInput.trim()) {
+    // 1. --- Input Validation ---
+    if (!state.inputText.trim()) {
       dispatch({ type: 'SET_ERROR', payload: 'Please enter some text to generate a quiz' });
       return;
     }
-
-    if (sanitizedInput.length < 150) {
+    if (state.inputText.length < 150) {
       dispatch({ type: 'SET_ERROR', payload: 'Please enter at least 150 characters for a meaningful quiz' });
       return;
     }
 
+    // --- API Key Check (from original logic) ---
     const apiKey = apiKeys[state.currentProvider];
     if (!apiKey) {
       dispatch({ 
@@ -45,7 +47,8 @@ const QuizTool = () => {
       return;
     }
 
-    const userId = 'user';
+    // 2. --- Rate Limiting ---
+    const userId = 'user'; // You might want to make this more specific
     if (!globalRateLimiter.checkLimit(userId)) {
       const remaining = globalRateLimiter.getRemainingRequests(userId);
       dispatch({ 
@@ -55,52 +58,64 @@ const QuizTool = () => {
       return;
     }
 
+    // 3. --- Set Loading State ---
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
+    dispatch({ type: 'SET_OUTPUT', payload: null }); // Clear old results
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // Simulated quiz based on input
-      const sentences = sanitizedInput.split(/[.!?]+/).filter(s => s.trim().length > 30);
-      const generatedQuestions = sentences.slice(0, 7).map((sentence, index) => {
-        const words = sentence.trim().split(' ').filter(w => w.length > 3);
-        const correctAnswer = words[Math.floor(Math.random() * words.length)];
-        
-        return {
-          id: index + 1,
-          question: `Based on the text, what is the key concept related to: "${sentence.trim().substring(0, 80)}..."?`,
-          options: [
-            correctAnswer,
-            words[Math.floor(Math.random() * words.length)] || 'Concept A',
-            words[Math.floor(Math.random() * words.length)] || 'Concept B',
-            'None of the above'
-          ].sort(() => Math.random() - 0.5),
-          correctAnswer: correctAnswer,
-          explanation: `This question tests your understanding of the main concepts in the provided text about ${words.slice(0, 3).join(' ')}.`
-        };
-      });
+      // 4. --- Call the AI Service ---
+      // We pass the raw inputText, as decided (no sanitization)
+      const aiResponse = await generate(
+        state.inputText, 
+        'quiz', // This must match your promptTemplates.js key
+      );
 
-      const quizData = {
-        metadata: {
-          generatedAt: new Date().toISOString(),
-          sourceLength: sanitizedInput.length,
-          questionCount: generatedQuestions.length,
-          provider: state.currentProvider
-        },
-        questions: generatedQuestions
-      };
+      // 5. --- Parse the AI's JSON Response ---
+      if (!aiResponse) {
+        throw new Error("The AI returned an empty response.");
+      }
 
+      let quizData;
+      if (typeof aiResponse === 'object') {
+        // The service already parsed the JSON
+        quizData = aiResponse;
+      } else {
+        // The AI returned a string, we need to parse it
+        try {
+          // Find the start of the JSON
+          const jsonMatch = aiResponse.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+          if (!jsonMatch) {
+            throw new Error("AI did not return valid JSON format.");
+          }
+          quizData = JSON.parse(jsonMatch[0]);
+        } catch (parseError) {
+          console.error("Failed to parse AI response:", aiResponse);
+          throw new Error("AI returned a malformed quiz. Please try again.");
+        }
+      }
+
+      // 6. --- Validate the JSON structure ---
+      if (!quizData.questions || !Array.isArray(quizData.questions) || quizData.questions.length === 0) {
+        console.error("Invalid quiz data structure:", quizData);
+        throw new Error("AI returned quiz data in an unknown format.");
+      }
+
+      // 7. --- Success: Set the output ---
       dispatch({ type: 'SET_OUTPUT', payload: quizData });
+
     } catch (error) {
+      // 8. --- Handle Errors ---
+      console.error("Quiz generation failed:", error);
       dispatch({ type: 'SET_ERROR', payload: `Failed to generate quiz: ${error.message}` });
     } finally {
+      // 9. --- Stop Loading ---
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
   const handleCopy = async () => {
-    if (state.output) {
+    if (state.output?.questions) { // 
       try {
         const textOutput = JSON.stringify(state.output, null, 2);
         await navigator.clipboard.writeText(textOutput);
@@ -113,7 +128,8 @@ const QuizTool = () => {
   };
 
   const handleExportClick = () => {
-    if (state.output) {
+    // ### FIX: Check for .questions to prevent crash ###
+    if (state.output?.questions) {
       try {
         const content = state.exportFormat === 'json' 
           ? JSON.stringify(state.output, null, 2)
@@ -282,7 +298,7 @@ Example: 'The human brain consists of several major parts: the cerebrum, cerebel
                           : option === selectedAnswer && option !== currentQuestionData.correctAnswer
                           ? 'border-red-500 bg-red-500 text-white'
                           : 'border-gray-300 text-gray-600'
-                      }`}>
+                      }`}>\
                         {String.fromCharCode(65 + index)}
                       </div>
                       <span className="text-lg">{option}</span>
@@ -327,7 +343,8 @@ Example: 'The human brain consists of several major parts: the cerebrum, cerebel
       )}
 
       {/* Quiz Results */}
-      {quizCompleted && (
+      {/* ### FIX: Check for .questions to prevent crash ### */}
+      {quizCompleted && state.output?.questions && (
         <div className="card animate-fade-in">
           <div className="text-center py-8">
             <div className={`mx-auto w-20 h-20 rounded-full flex items-center justify-center mb-4 ${
@@ -381,7 +398,8 @@ Example: 'The human brain consists of several major parts: the cerebrum, cerebel
       )}
 
       {/* Output Section */}
-      {state.output && !quizMode && (
+      {/* ### FIX: Check for .questions to prevent crash ### */}
+      {state.output?.questions && !quizMode && (
         <div className="card animate-fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
             <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
@@ -428,7 +446,7 @@ Example: 'The human brain consists of several major parts: the cerebrum, cerebel
           <div className="space-y-6 max-h-96 overflow-y-auto">
             {state.output.questions.map((question, index) => (
               <div
-                key={question.id}
+                key={question.id || index} // Fallback to index if id isn't provided
                 className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-start justify-between mb-4">
@@ -475,7 +493,8 @@ Example: 'The human brain consists of several major parts: the cerebrum, cerebel
       )}
 
       {/* Empty State */}
-      {!state.output && !state.isLoading && (
+      {/* ### FIX: Check for .questions to prevent crash ### */}
+      {!state.output?.questions && !state.isLoading && (
         <div className="card text-center py-12">
           <HelpCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Ready for Quiz</h3>

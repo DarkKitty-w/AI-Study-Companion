@@ -3,13 +3,15 @@ import React, { useState } from 'react';
 import { Download, Copy, Database, RotateCcw, Filter, Search, FileText, Globe } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useApiKeys } from '../../hooks/useApiKeys';
+import { useAIClient } from '../../hooks/useAIClient'; // 
 import { handleExport } from '../../services/exporters';
-import { sanitizeInput } from '../../utils/sanitize';
+// import { sanitizeInput } from '../../utils/sanitize'; // 
 import { globalRateLimiter } from '../../utils/rateLimit';
 
 const DataExtractorTool = () => {
   const { state, dispatch } = useApp();
   const { apiKeys } = useApiKeys();
+  const { generate } = useAIClient(); // 
   const [isCopied, setIsCopied] = useState(false);
   const [charCount, setCharCount] = useState(0);
   const [inputType, setInputType] = useState('text');
@@ -37,26 +39,25 @@ const DataExtractorTool = () => {
     }
   };
 
+  // ### FIX: This is the new, correct function that calls the AI ###
   const extractData = async () => {
-    let content = state.inputText;
-
+    // 1. --- Input Validation (from URL, file, or text) ---
     if (inputType === 'url' && url) {
-      // In a real implementation, you would fetch the URL content
-      dispatch({ type: 'SET_ERROR', payload: 'URL processing requires backend implementation' });
+      // In a real implementation, you would fetch the URL content on a backend
+      dispatch({ type: 'SET_ERROR', payload: 'URL processing requires a backend implementation (to avoid CORS issues)' });
       return;
     }
 
-    if (!content.trim()) {
+    if (!state.inputText.trim()) {
       dispatch({ type: 'SET_ERROR', payload: 'Please provide some content to extract data from' });
       return;
     }
-
-    const sanitizedInput = sanitizeInput(content);
-    if (sanitizedInput.length < 50) {
+    if (state.inputText.length < 50) {
       dispatch({ type: 'SET_ERROR', payload: 'Please provide at least 50 characters for meaningful data extraction' });
       return;
     }
 
+    // 2. --- API Key Check ---
     const apiKey = apiKeys[state.currentProvider];
     if (!apiKey) {
       dispatch({ 
@@ -66,6 +67,7 @@ const DataExtractorTool = () => {
       return;
     }
 
+    // 3. --- Rate Limiting ---
     const userId = 'user';
     if (!globalRateLimiter.checkLimit(userId)) {
       const remaining = globalRateLimiter.getRemainingRequests(userId);
@@ -76,78 +78,71 @@ const DataExtractorTool = () => {
       return;
     }
 
+    // 4. --- Set Loading State ---
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
+    dispatch({ type: 'SET_OUTPUT', payload: null }); // Clear old results
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 3200));
-      
-      // Simulated data extraction
-      const sentences = sanitizedInput.split(/[.!?]+/).filter(s => s.trim().length > 20);
-      const words = sanitizedInput.split(/\s+/).filter(word => word.length > 0);
-      
-      // Extract potential statistics (numbers in text)
-      const numbers = sanitizedInput.match(/\b\d+\.?\d*\b/g) || [];
-      const statistics = numbers.slice(0, 5).map(num => ({
-        id: numbers.indexOf(num) + 1,
-        value: num,
-        context: `Found in: ${sentences.find(s => s.includes(num))?.substring(0, 100) || 'context'}`,
-        type: 'statistic'
-      }));
+      // 5. --- Call the AI Service ---
+      const aiResponse = await generate(
+        state.inputText, 
+        'dataextractor' // This must match your promptTemplates.js key
+      );
 
-      // Extract potential definitions (sentences with "is" or "are")
-      const definitions = sentences.filter(s => 
-        s.toLowerCase().includes(' is ') || 
-        s.toLowerCase().includes(' are ') ||
-        s.toLowerCase().includes(' defined as ')
-      ).slice(0, 5).map((sentence, index) => ({
-        id: index + 1,
-        term: sentence.split(' ').find(word => word.length > 4) || 'Term',
-        definition: sentence.trim(),
-        type: 'definition'
-      }));
+      // 6. --- Parse the AI's JSON Response ---
+      if (!aiResponse) {
+        throw new Error("The AI returned an empty response.");
+      }
 
-      // Extract key findings (sentences with keywords)
-      const findings = sentences.filter(s => 
-        s.toLowerCase().includes('found that') ||
-        s.toLowerCase().includes('concluded') ||
-        s.toLowerCase().includes('results show') ||
-        s.toLowerCase().includes('significant')
-      ).slice(0, 5).map((sentence, index) => ({
-        id: index + 1,
-        finding: sentence.trim(),
-        confidence: (70 + Math.random() * 25).toFixed(0) + '%',
-        type: 'finding'
-      }));
-
-      const extractedData = {
-        metadata: {
-          generatedAt: new Date().toISOString(),
-          sourceLength: sanitizedInput.length,
-          wordCount: words.length,
-          sentenceCount: sentences.length,
-          provider: state.currentProvider,
-          sourceType: inputType
-        },
-        statistics,
-        definitions,
-        findings,
-        summary: {
-          totalExtracted: statistics.length + definitions.length + findings.length,
-          dataTypes: ['statistics', 'definitions', 'findings']
+      let extractedData;
+      if (typeof aiResponse === 'object') {
+        // The service already parsed the JSON
+        extractedData = aiResponse;
+      } else {
+        // The AI returned a string, we need to parse it
+        try {
+          // Find the start of the JSON
+          const jsonMatch = aiResponse.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+          if (!jsonMatch) {
+            throw new Error("AI did not return valid JSON format.");
+          }
+          extractedData = JSON.parse(jsonMatch[0]);
+        } catch (parseError) {
+          console.error("Failed to parse AI response:", aiResponse);
+          throw new Error("AI returned a malformed data object. Please try again.");
         }
+      }
+
+      // 7. --- Validate the JSON structure ---
+      if (!extractedData.statistics || !extractedData.definitions || !extractedData.findings) {
+        console.error("Invalid data structure:", extractedData);
+        throw new Error("AI returned data in an unknown format.");
+      }
+      
+      // Add summary data for the UI
+      extractedData.summary = {
+        totalExtracted: extractedData.statistics.length + extractedData.definitions.length + extractedData.findings.length,
+        dataTypes: ['statistics', 'definitions', 'findings']
       };
 
+      // 8. --- Success: Set the output ---
       dispatch({ type: 'SET_OUTPUT', payload: extractedData });
+
     } catch (error) {
+      // 9. --- Handle Errors ---
+      console.error("Data extraction failed:", error);
       dispatch({ type: 'SET_ERROR', payload: `Failed to extract data: ${error.message}` });
     } finally {
+      // 10. --- Stop Loading ---
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
+
   const handleCopy = async () => {
-    if (state.output) {
+    // ### FIX: Check for .statistics (or any unique key) ###
+    if (state.output?.statistics) {
       try {
         const textOutput = JSON.stringify(state.output, null, 2);
         await navigator.clipboard.writeText(textOutput);
@@ -160,7 +155,8 @@ const DataExtractorTool = () => {
   };
 
   const handleExportClick = () => {
-    if (state.output) {
+    // ### FIX: Check for .statistics ###
+    if (state.output?.statistics) {
       try {
         const content = state.exportFormat === 'json' 
           ? JSON.stringify(state.output, null, 2)
@@ -175,11 +171,9 @@ const DataExtractorTool = () => {
 
   const formatDataAsText = (data) => {
     let text = `Data Extracted: ${new Date().toLocaleString()}\n`;
-    text += `Source: ${data.metadata.sourceType}\n`;
-    text += `Word Count: ${data.metadata.wordCount}\n`;
     text += `Total Items Extracted: ${data.summary.totalExtracted}\n\n`;
     
-    if (data.statistics.length > 0) {
+    if (data.statistics?.length > 0) {
       text += `📊 STATISTICS (${data.statistics.length} items)\n`;
       text += '─'.repeat(50) + '\n';
       data.statistics.forEach(stat => {
@@ -188,7 +182,7 @@ const DataExtractorTool = () => {
       text += '\n';
     }
     
-    if (data.definitions.length > 0) {
+    if (data.definitions?.length > 0) {
       text += `📖 DEFINITIONS (${data.definitions.length} items)\n`;
       text += '─'.repeat(50) + '\n';
       data.definitions.forEach(def => {
@@ -197,7 +191,7 @@ const DataExtractorTool = () => {
       text += '\n';
     }
     
-    if (data.findings.length > 0) {
+    if (data.findings?.length > 0) {
       text += `🔍 FINDINGS (${data.findings.length} items)\n`;
       text += '─'.repeat(50) + '\n';
       data.findings.forEach(finding => {
@@ -219,7 +213,10 @@ const DataExtractorTool = () => {
   };
 
   const filteredData = () => {
-    if (!state.output) return { statistics: [], definitions: [], findings: [] };
+    // ### FIX: Check for .statistics to prevent crash ###
+    if (!state.output?.statistics) {
+      return { statistics: [], definitions: [], findings: [] };
+    }
     
     let data = { ...state.output };
     
@@ -353,7 +350,7 @@ Example: 'The study found that 75% of participants showed significant improvemen
                 <input
                   type="file"
                   onChange={handleFileUpload}
-                  accept=".txt,.pdf,.doc,.docx"
+                  accept=".txt,.pdf,.doc,.docx" // Note: PDF/DOC parsing needs a backend
                   className="hidden"
                   id="file-upload"
                 />
@@ -366,7 +363,7 @@ Example: 'The study found that 75% of participants showed significant improvemen
                     {file ? file.name : 'Click to upload or drag and drop'}
                   </p>
                   <p className="text-sm text-gray-500">
-                    TXT, PDF, DOC, DOCX (Max 10MB)
+                    TXT files only (PDF/DOC requires backend)
                   </p>
                 </label>
               </div>
@@ -393,7 +390,7 @@ Example: 'The study found that 75% of participants showed significant improvemen
 
           <button
             onClick={extractData}
-            disabled={state.isLoading || !state.inputText.trim()}
+            disabled={state.isLoading || (!state.inputText.trim() && !url.trim())}
             className="btn-primary w-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Database className="h-4 w-4 mr-2" />
@@ -403,12 +400,13 @@ Example: 'The study found that 75% of participants showed significant improvemen
       </div>
 
       {/* Output Section */}
-      {state.output && (
+      {/* ### FIX: Check for .statistics to prevent crash ### */}
+      {state.output?.statistics && (
         <div className="card animate-fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
             <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
               <Database className="h-5 w-5 text-indigo-500" />
-              <span>Extracted Data ({state.output.summary.totalExtracted} items)</span>
+              <span>Extracted Data ({state.output.summary?.totalExtracted || 0} items)</span>
             </h2>
             <div className="flex items-center space-x-2">
               <select
@@ -475,8 +473,8 @@ Example: 'The study found that 75% of participants showed significant improvemen
                   Statistics ({currentData.statistics.length})
                 </h3>
                 <div className="space-y-2">
-                  {currentData.statistics.map(stat => (
-                    <div key={stat.id} className="bg-white rounded-lg p-3 border border-blue-100">
+                  {currentData.statistics.map((stat, index) => (
+                    <div key={stat.id || index} className="bg-white rounded-lg p-3 border border-blue-100">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-blue-700 text-lg">{stat.value}</span>
                         <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Statistic</span>
@@ -496,8 +494,8 @@ Example: 'The study found that 75% of participants showed significant improvemen
                   Definitions ({currentData.definitions.length})
                 </h3>
                 <div className="space-y-3">
-                  {currentData.definitions.map(def => (
-                    <div key={def.id} className="bg-white rounded-lg p-3 border border-green-100">
+                  {currentData.definitions.map((def, index) => (
+                    <div key={def.id || index} className="bg-white rounded-lg p-3 border border-green-100">
                       <h4 className="font-medium text-green-700">{def.term}</h4>
                       <p className="text-sm text-gray-700 mt-1">{def.definition}</p>
                     </div>
@@ -514,8 +512,8 @@ Example: 'The study found that 75% of participants showed significant improvemen
                   Findings ({currentData.findings.length})
                 </h3>
                 <div className="space-y-3">
-                  {currentData.findings.map(finding => (
-                    <div key={finding.id} className="bg-white rounded-lg p-3 border border-purple-100">
+                  {currentData.findings.map((finding, index) => (
+                    <div key={finding.id || index} className="bg-white rounded-lg p-3 border border-purple-100">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium text-purple-700">Finding</span>
                         <span className={`text-xs px-2 py-1 rounded ${
@@ -550,7 +548,8 @@ Example: 'The study found that 75% of participants showed significant improvemen
       )}
 
       {/* Empty State */}
-      {!state.output && !state.isLoading && (
+      {/* ### FIX: Check if output is NOT a data object (or is null) ### */}
+      {(!state.output?.statistics) && !state.isLoading && (
         <div className="card text-center py-12">
           <Database className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Extract Structured Data</h3>

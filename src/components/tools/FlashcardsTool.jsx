@@ -3,15 +3,19 @@ import React, { useState } from 'react';
 import { Download, Copy, Layout, RotateCcw, Shuffle, CheckCircle } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useApiKeys } from '../../hooks/useApiKeys';
+import { useAIClient } from '../../hooks/useAIClient'; // 
 import { handleExport } from '../../services/exporters';
-import { sanitizeInput } from '../../utils/sanitize';
+// import { sanitizeInput } from '../../utils/sanitize'; // 
 import { globalRateLimiter } from '../../utils/rateLimit';
 
 const FlashcardsTool = () => {
   const { state, dispatch } = useApp();
   const { apiKeys } = useApiKeys();
+  const { generate } = useAIClient(); // 
   const [isCopied, setIsCopied] = useState(false);
   const [charCount, setCharCount] = useState(0);
+  // Note: flashcardCount is not yet wired up to the AI prompt,
+  // but we'll leave the UI state for future improvement.
   const [flashcardCount, setFlashcardCount] = useState(10);
   const [studyMode, setStudyMode] = useState(false);
   const [currentCard, setCurrentCard] = useState(0);
@@ -23,18 +27,19 @@ const FlashcardsTool = () => {
     setCharCount(text.length);
   };
 
+  // ### FIX: This is the new, correct function that calls the AI ###
   const generateFlashcards = async () => {
-    const sanitizedInput = sanitizeInput(state.inputText);
-    if (!sanitizedInput.trim()) {
+    // 1. --- Input Validation ---
+    if (!state.inputText.trim()) {
       dispatch({ type: 'SET_ERROR', payload: 'Please enter some text to generate flashcards' });
       return;
     }
-
-    if (sanitizedInput.length < 100) {
+    if (state.inputText.length < 100) {
       dispatch({ type: 'SET_ERROR', payload: 'Please enter at least 100 characters for meaningful flashcards' });
       return;
     }
 
+    // 2. --- API Key Check ---
     const apiKey = apiKeys[state.currentProvider];
     if (!apiKey) {
       dispatch({ 
@@ -44,6 +49,7 @@ const FlashcardsTool = () => {
       return;
     }
 
+    // 3. --- Rate Limiting ---
     const userId = 'user';
     if (!globalRateLimiter.checkLimit(userId)) {
       const remaining = globalRateLimiter.getRemainingRequests(userId);
@@ -54,42 +60,66 @@ const FlashcardsTool = () => {
       return;
     }
 
+    // 4. --- Set Loading State ---
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
+    dispatch({ type: 'SET_OUTPUT', payload: null }); // Clear old results
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 2500));
-      
-      // Simulated flashcards based on input
-      const sentences = sanitizedInput.split(/[.!?]+/).filter(s => s.trim().length > 20);
-      const generatedCards = sentences.slice(0, flashcardCount).map((sentence, index) => ({
-        id: index + 1,
-        question: `What is the main idea about: "${sentence.trim().substring(0, 100)}..."?`,
-        answer: `This discusses ${sentence.trim().split(' ').slice(0, 5).join(' ')}...`,
-        category: 'General',
-        difficulty: index % 3 === 0 ? 'Easy' : index % 3 === 1 ? 'Medium' : 'Hard'
-      }));
+      // 5. --- Call the AI Service ---
+      // We pass the raw inputText, as decided (no sanitization)
+      const aiResponse = await generate(
+        state.inputText, 
+        'flashcards' // This must match your promptTemplates.js key
+      );
 
-      const flashcardsData = {
-        metadata: {
-          generatedAt: new Date().toISOString(),
-          sourceLength: sanitizedInput.length,
-          cardCount: generatedCards.length,
-          provider: state.currentProvider
-        },
-        flashcards: generatedCards
-      };
+      // 6. --- Parse the AI's JSON Response ---
+      if (!aiResponse) {
+        throw new Error("The AI returned an empty response.");
+      }
 
+      let flashcardsData;
+      if (typeof aiResponse === 'object') {
+        // The service already parsed the JSON
+        flashcardsData = aiResponse;
+      } else {
+        // The AI returned a string, we need to parse it
+        try {
+          // Find the start of the JSON
+          const jsonMatch = aiResponse.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+          if (!jsonMatch) {
+            throw new Error("AI did not return valid JSON format.");
+          }
+          flashcardsData = JSON.parse(jsonMatch[0]);
+        } catch (parseError) {
+          console.error("Failed to parse AI response:", aiResponse);
+          throw new Error("AI returned a malformed flashcard set. Please try again.");
+        }
+      }
+
+      // 7. --- Validate the JSON structure ---
+      if (!flashcardsData.flashcards || !Array.isArray(flashcardsData.flashcards) || flashcardsData.flashcards.length === 0) {
+        console.error("Invalid flashcard data structure:", flashcardsData);
+        throw new Error("AI returned flashcard data in an unknown format.");
+      }
+
+      // 8. --- Success: Set the output ---
       dispatch({ type: 'SET_OUTPUT', payload: flashcardsData });
+      
     } catch (error) {
+      // 9. --- Handle Errors ---
+      console.error("Flashcard generation failed:", error);
       dispatch({ type: 'SET_ERROR', payload: `Failed to generate flashcards: ${error.message}` });
     } finally {
+      // 10. --- Stop Loading ---
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
+
   const handleCopy = async () => {
-    if (state.output) {
+    // ### FIX: Check for .flashcards ###
+    if (state.output?.flashcards) {
       try {
         const textOutput = JSON.stringify(state.output, null, 2);
         await navigator.clipboard.writeText(textOutput);
@@ -102,7 +132,8 @@ const FlashcardsTool = () => {
   };
 
   const handleExportClick = () => {
-    if (state.output) {
+    // ### FIX: Check for .flashcards ###
+    if (state.output?.flashcards) {
       try {
         const content = state.exportFormat === 'json' 
           ? JSON.stringify(state.output, null, 2)
@@ -147,7 +178,8 @@ const FlashcardsTool = () => {
   };
 
   const nextCard = () => {
-    if (state.output && currentCard < state.output.flashcards.length - 1) {
+    // ### FIX: Check for .flashcards ###
+    if (state.output?.flashcards && currentCard < state.output.flashcards.length - 1) {
       setCurrentCard(currentCard + 1);
       setShowAnswer(false);
     }
@@ -166,7 +198,8 @@ const FlashcardsTool = () => {
   };
 
   const shuffleCards = () => {
-    if (state.output) {
+    // ### FIX: Check for .flashcards ###
+    if (state.output?.flashcards) {
       const shuffled = [...state.output.flashcards];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -228,12 +261,13 @@ Example: 'Photosynthesis is the process used by plants to convert sunlight into 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Number of Flashcards
+                Number of Flashcards (AI Default)
               </label>
               <select
                 value={flashcardCount}
                 onChange={(e) => setFlashcardCount(parseInt(e.target.value))}
                 className="input-field"
+                disabled // Disabled for now, as it's not wired into the prompt
               >
                 <option value="5">5 Flashcards</option>
                 <option value="10">10 Flashcards</option>
@@ -326,7 +360,7 @@ Example: 'Photosynthesis is the process used by plants to convert sunlight into 
             </button>
             <button
               onClick={nextCard}
-              disabled={currentCard === state.output.flashcards.length - 1}
+              disabled={!state.output?.flashcards || currentCard === state.output.flashcards.length - 1}
               className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next Card
@@ -336,7 +370,8 @@ Example: 'Photosynthesis is the process used by plants to convert sunlight into 
       )}
 
       {/* Output Section */}
-      {state.output && !studyMode && (
+      {/* ### FIX: Check for .flashcards to prevent crash ### */}
+      {state.output?.flashcards && !studyMode && (
         <div className="card animate-fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
             <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
@@ -390,7 +425,7 @@ Example: 'Photosynthesis is the process used by plants to convert sunlight into 
           <div className="grid gap-4 max-h-96 overflow-y-auto">
             {state.output.flashcards.map((card, index) => (
               <div
-                key={card.id}
+                key={card.id || index} // Fallback to index
                 className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-start justify-between mb-2">
@@ -414,7 +449,8 @@ Example: 'Photosynthesis is the process used by plants to convert sunlight into 
       )}
 
       {/* Empty State */}
-      {!state.output && !state.isLoading && (
+      {/* ### FIX: Check if output is NOT a flashcard object (or is null) ### */}
+      {(!state.output?.flashcards) && !state.isLoading && (
         <div className="card text-center py-12">
           <Layout className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Ready for Flashcards</h3>

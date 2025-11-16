@@ -3,64 +3,108 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Define all your light-mode colors as variables */
+    --bg-default: theme('colors.gray.50');
+    --bg-card: theme('colors.white');
+    --bg-card-hover: theme('colors.gray.50');
+    --bg-input: theme('colors.white');
+    --bg-btn-primary: theme('colors.gray.800');
+    --bg-btn-primary-hover: theme('colors.gray.700');
+    --bg-btn-secondary: theme('colors.white');
+    --bg-btn-secondary-hover: theme('colors.gray.50');
+    
+    --text-default: theme('colors.gray.800');
+    --text-muted: theme('colors.gray.500');
+    --text-btn-primary: theme('colors.white');
+    --text-btn-secondary: theme('colors.gray.700');
+    
+    --border-default: theme('colors.gray.200');
+    --border-input: theme('colors.gray.300');
+    --border-active: theme('colors.gray.400');
+
+    --ring-focus: theme('colors.gray.500');
+
+    /* Error Colors */
+    --bg-error: theme('colors.red.100');
+    --text-error: theme('colors.red.800');
+    --border-error: theme('colors.red.300');
+  }
+
+  .dark {
+    /* Define all your dark-mode overrides */
+    --bg-default: theme('colors.gray.900');
+    --bg-card: theme('colors.gray.800');
+    --bg-card-hover: theme('colors.gray.700');
+    --bg-input: theme('colors.gray.800');
+    --bg-btn-primary: theme('colors.gray.700');
+    --bg-btn-primary-hover: theme('colors.gray.600');
+    --bg-btn-secondary: theme('colors.gray.800');
+    --bg-btn-secondary-hover: theme('colors.gray.700');
+
+    --text-default: theme('colors.gray.200');
+    --text-muted: theme('colors.gray.400');
+    --text-btn-primary: theme('colors.white');
+    --text-btn-secondary: theme('colors.gray.200');
+
+    --border-default: theme('colors.gray.700');
+    --border-input: theme('colors.gray.600');
+    --border-active: theme('colors.gray.600');
+    
+    --ring-focus: theme('colors.gray.500');
+
+    /* Error Colors */
+    --bg-error: theme('colors.red.900');
+    --text-error: theme('colors.red.200');
+    --border-error: theme('colors.red.700');
+  }
+
   body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    @apply text-gray-800 bg-gray-50;
-  }
-
-  /* Dark theme styles */
-  .dark body {
-    @apply text-gray-200 bg-gray-900;
-  }
-
-  .dark .card {
-    @apply bg-gray-800 border-gray-700;
-  }
-
-  .dark .input-field {
-    @apply bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-400 focus:border-gray-500 focus:ring-gray-500;
-  }
-
-  .dark .btn-primary {
-    @apply bg-gray-700 hover:bg-gray-600 text-white;
-  }
-
-  .dark .btn-secondary {
-    @apply bg-gray-800 hover:bg-gray-700 text-gray-200 border-gray-600;
-  }
-
-  .dark .tool-card {
-    @apply bg-gray-800 border-gray-700 hover:border-gray-600;
-  }
-
-  .dark .tool-card-active {
-    @apply border-gray-600 bg-gray-700;
+    /* NOTE: This assumes you've added 'Inter' to your tailwind.config.js
+      theme: { fontFamily: { sans: ['Inter', ...defaultTheme.fontFamily.sans] } }
+    */
+    @apply font-sans bg-[var(--bg-default)] text-[var(--text-default)];
   }
 }
 
 @layer components {
+  /* 1. Base button class for all shared styles */
+  .btn {
+    @apply font-medium py-2.5 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--ring-focus)] focus:ring-offset-2;
+  }
+  
+  /* 2. Variant classes only handle colors */
   .btn-primary {
-    @apply bg-gray-800 hover:bg-gray-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+    @apply btn bg-[var(--bg-btn-primary)] text-[var(--text-btn-primary)] hover:bg-[var(--bg-btn-primary-hover)];
   }
   
   .btn-secondary {
-    @apply bg-white hover:bg-gray-50 text-gray-700 font-medium py-2.5 px-4 rounded-lg border border-gray-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+    @apply btn bg-[var(--bg-btn-secondary)] text-[var(--text-btn-secondary)] border border-[var(--border-input)] hover:bg-[var(--bg-btn-secondary-hover)];
   }
   
+  /* 3. Components now use the variables */
   .input-field {
-    @apply w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-white text-gray-900 placeholder-gray-500;
+    @apply w-full px-3 py-2.5 rounded-lg transition-colors
+           border border-[var(--border-input)] 
+           bg-[var(--bg-input)] 
+           text-[var(--text-default)] 
+           placeholder-[var(--text-muted)]
+           focus:outline-none focus:ring-2 focus:ring-[var(--ring-focus)] focus:border-[var(--border-input)];
   }
   
   .card {
-    @apply bg-white rounded-lg border border-gray-200 shadow-sm p-6;
+    @apply rounded-lg border border-[var(--border-default)] bg-[var(--bg-card)] shadow-sm p-6;
   }
   
   .tool-card {
-    @apply w-full text-left p-4 rounded-lg border border-gray-200 hover:border-gray-300 bg-white hover:shadow-sm transition-all duration-200;
+    @apply w-full text-left p-4 rounded-lg transition-all duration-200
+           border border-[var(--border-default)] 
+           bg-[var(--bg-card)] 
+           hover:border-[var(--border-active)] hover:shadow-sm;
   }
   
   .tool-card-active {
-    @apply border-gray-400 bg-gray-50 shadow-sm;
+    @apply border-[var(--border-active)] bg-[var(--bg-card-hover)] shadow-sm;
   }
 }
 

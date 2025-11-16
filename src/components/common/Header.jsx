@@ -20,7 +20,7 @@ const Header = () => {
           
           <div className="flex items-center space-x-4">
             <a
-              href="https://github.com/your-username/ai-study-companion"
+              href="https://github.com/DarkKitty-w/AI-Study-Companion"
               target="_blank"
               rel="noopener noreferrer"
               className="text-gray-400 hover:text-gray-600 transition-colors p-2"
