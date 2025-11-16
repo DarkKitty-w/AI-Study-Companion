@@ -55,99 +55,8 @@ AI Study Companion is a **revolutionary browser-based application** that leverag
 - **🔧 Model Customization**: Choose specific AI models per provider
 - **📊 Progress Tracking**: Visual feedback for all operations
 - **🎯 One-Click Export**: Multiple format support (PDF, JSON, Text, CSV, Markdown)
-- **🔍 Search & Filter**: Find specific content in generated materials
 - **🎨 Interactive Modes**: Study mode for flashcards, quiz mode with scoring
 
-## 🏗️ Tech Stack & Architecture
-
-### Frontend Architecture
-```javascript
-// Modern React 18 with Hooks and Context
-Tech Stack: {
-  frontend: {
-    framework: "React 18.2 + Vite",
-    styling: "Tailwind CSS + Custom Components",
-    state: "React Context + useReducer",
-    build: "Vite (2-3x faster than CRA)",
-    icons: "Lucide React",
-    pdf: "jsPDF"
-  },
-  security: {
-    encryption: "CryptoJS AES-256",
-    validation: "Custom sanitization library",
-    rate: "Token bucket algorithm"
-  },
-  ai: {
-    providers: ["OpenAI", "Anthropic", "Google", "Groq", "DeepSeek", "HuggingFace"],
-    architecture: "Unified client interface",
-    prompts: "Structured template system"
-  }
-}
-```
-
-### AI Provider Integration
-```javascript
-// Unified AI Client Architecture
-const aiClient = {
-  openai: {
-    models: ['GPT-4', 'GPT-3.5-Turbo', 'GPT-4o'],
-    endpoint: 'https://api.openai.com/v1/chat/completions',
-    features: 'High accuracy, extensive training'
-  },
-  anthropic: {
-    models: ['Claude-3-Opus', 'Claude-3-Sonnet', 'Claude-3-Haiku'],
-    endpoint: 'https://api.anthropic.com/v1/messages',
-    features: 'Constitutional AI, safety-focused'
-  },
-  google: {
-    models: ['Gemini Pro', 'Gemini Flash'],
-    endpoint: 'Google AI Studio',
-    features: 'Multimodal capabilities, fast inference'
-  },
-  groq: {
-    models: ['Llama2-70B', 'Mixtral-8x7B'],
-    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-    features: 'Ultra-fast LPU inference engine'
-  },
-  deepseek: {
-    models: ['DeepSeek-Chat', 'DeepSeek-Coder'],
-    endpoint: 'https://api.deepseek.com/v1/chat/completions',
-    features: 'Cost-effective, high performance'
-  },
-  huggingface: {
-    models: ['200,000+ community models'],
-    endpoint: 'https://api-inference.huggingface.co',
-    features: 'Open-source, customizable models'
-  }
-};
-```
-
-### Security Implementation
-```javascript
-// Comprehensive Security Stack
-Security: {
-  encryption: {
-    algorithm: "AES-256",
-    storage: "localStorage with encryption",
-    keys: "Never transmitted to servers"
-  },
-  validation: {
-    input: "HTML/JS injection prevention",
-    api_keys: "Format validation per provider",
-    files: "Type and size validation"
-  },
-  rate: {
-    algorithm: "Token bucket",
-    limits: "15 requests/minute per user",
-    protection: "API cost management"
-  },
-  privacy: {
-    data: "100% local processing",
-    retention: "No server storage",
-    compliance: "GDPR/FERPA ready"
-  }
-}
-```
 
 ## 🚀 Installation & Setup
 
@@ -175,13 +84,6 @@ npm run build
 npm run preview
 ```
 
-### Environment Configuration (Optional)
-```env
-# Create .env file for enhanced security (optional)
-VITE_ENCRYPTION_KEY=your-super-secure-key-here
-VITE_APP_VERSION=1.0.0
-VITE_MAX_FILE_SIZE=10485760
-```
 
 ### API Key Setup
 1. **OpenAI**: Get keys from [OpenAI Platform](https://platform.openai.com/api-keys)
@@ -293,194 +195,25 @@ ai-study-companion/
 └── vite.config.js          # Vite Configuration
 ```
 
-### Component Architecture
-```javascript
-// Unified State Management
-const AppState = {
-  apiKeys: {},              // Encrypted API keys
-  currentTool: 'summarize', // Active tool
-  currentProvider: 'openai', // AI provider
-  isLoading: false,         // Loading states
-  error: null,             // Error handling
-  output: null,            // AI generated content
-  inputText: '',           // User input
-  exportFormat: 'text'     // Export preferences
-};
-
-// Tool-Specific Processing
-const ToolProcessors = {
-  summarize: {
-    input: 'Raw text',
-    output: 'Structured summary',
-    prompts: 'Bullet points + key takeaways'
-  },
-  flashcards: {
-    input: 'Study material',
-    output: 'Q&A JSON structure',
-    prompts: 'Comprehension-focused questions'
-  },
-  quiz: {
-    input: 'Educational content',
-    output: 'Multiple-choice questions',
-    prompts: 'Analysis and application questions'
-  },
-  mindmap: {
-    input: 'Complex concepts',
-    output: 'Hierarchical structure',
-    prompts: 'Central idea + topics + subtopics'
-  },
-  dataextractor: {
-    input: 'Research/content',
-    output: 'Structured data',
-    prompts: 'Statistics + definitions + findings'
-  }
-};
-```
-
-## 🔧 API Integration Details
-
-### Unified AI Client Interface
-```javascript
-class AIService {
-  // Support for 6+ AI providers
-  providers = ['openai', 'anthropic', 'google', 'groq', 'deepseek', 'huggingface'];
-  
-  // Unified generation method
-  async generate(provider, prompt, toolType, model) {
-    // Automatic failover between providers
-    // Consistent response formatting
-    // Comprehensive error handling
-  }
-  
-  // Security features
-  setClient(provider, apiKey) {
-    // API key validation
-    // Client initialization
-    // Error recovery
-  }
-}
-```
-
-### Prompt Engineering System
-```javascript
-const PROMPT_TEMPLATES = {
-  summarize: `
-**Requirements:**
-- Extract main ideas and key points
-- Create 5-7 concise bullet points
-- Include "Key Takeaways" section
-- Focus on essential information
-
-**Text:** {input}
-  `,
-  
-  flashcards: `
-**Requirements:**
-- 10-15 comprehension-focused questions
-- Mix of difficulty levels (Easy/Medium/Hard)
-- Accurate and informative answers
-- JSON format with categories
-
-**Text:** {input}
-  `,
-  
-  // ... similar structured prompts for all tools
-};
-```
-
-## 🛡️ Security Implementation
-
-### Encryption System
-```javascript
-// AES-256 Encryption for sensitive data
-export const encryptData = (data) => {
-  return CryptoJS.AES.encrypt(JSON.stringify(data), SECRET_KEY).toString();
-};
-
-export const decryptData = (cipherText) => {
-  const bytes = CryptoJS.AES.decrypt(cipherText, SECRET_KEY);
-  return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
-};
-
-// Secure API Key Storage
-const secureStorage = {
-  keys: 'AES-256 encrypted in localStorage',
-  validation: 'Provider-specific format checking',
-  isolation: 'Never transmitted to our servers'
-};
-```
-
-### Input Sanitization
-```javascript
-export const sanitizeInput = (input) => {
-  return input
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/javascript:/gi, '')
-    .replace(/on\w+=/gi, '')
-    .replace(/data:/gi, '')
-    .replace(/vbscript:/gi, '')
-    .trim();
-};
-
-// Comprehensive validation
-export const validateApiKey = (key, provider) => {
-  const patterns = {
-    openai: /^sk-[a-zA-Z0-9]{48}$/,
-    anthropic: /^sk-ant-[a-zA-Z0-9_-]{95}$/,
-    google: /^AIza[0-9A-Za-z-_]{35}$/,
-    // ... all provider validations
-  };
-  return patterns[provider].test(key);
-};
-```
-
-### Rate Limiting Algorithm
-```javascript
-export class RateLimiter {
-  constructor(maxRequests = 15, timeWindow = 60000) {
-    this.maxRequests = maxRequests;
-    this.timeWindow = timeWindow;
-    this.requests = new Map();
-  }
-
-  checkLimit(userId) {
-    const now = Date.now();
-    const userRequests = this.requests.get(userId) || [];
-    
-    // Clean old requests
-    const recentRequests = userRequests.filter(time => now - time < this.timeWindow);
-    
-    if (recentRequests.length >= this.maxRequests) {
-      return false; // Rate limit exceeded
-    }
-    
-    recentRequests.push(now);
-    this.requests.set(userId, recentRequests);
-    return true; // Request allowed
-  }
-}
-```
 
 ## 🎯 Innovation Points
 
 ### 🏆 Technical Excellence
 1. **Multi-Provider AI Orchestration**
    - Automatic failover between 6+ AI providers
-   - Cost-optimized model selection
    - Unified response formatting across providers
    - Provider-specific error handling and recovery
 
 2. **Advanced Security Implementation**
-   - Military-grade AES-256 encryption for all sensitive data
+   - AES-256 encryption
    - Comprehensive input sanitization preventing XSS and injection
    - Token bucket rate limiting algorithm
-   - Zero data retention policy
+   - Zero data retention
 
 3. **Performance Optimization**
    - Vite build system for instant reloads and optimal bundling
    - Code splitting and lazy loading for optimal performance
    - Optimized re-renders with React.memo and useCallback
-   - 95+ Lighthouse performance score
 
 ### 🎨 User Experience Innovation
 1. **Zero Learning Curve**
@@ -493,11 +226,10 @@ export class RateLimiter {
    - Multiple format support (PDF, JSON, Text, Markdown, DOT)
    - Custom naming conventions and metadata
    - Batch export capabilities
-   - Direct integration with popular study apps
 
 3. **Interactive Learning Modes**
-   - Study mode with spaced repetition for flashcards
-   - Interactive quiz mode with scoring and explanations
+   - Study mode for flashcards
+   - Interactive quiz mode with explanations
    - Visual mind map exploration
    - Search and filter across all generated content
 
@@ -519,135 +251,34 @@ export class RateLimiter {
 ### AI Tools Used in Development
 
 #### ChatGPT (OpenAI)
-**Purpose**: Ideation, Feature Planning, and Architecture Design
-- **Initial Concept Development**: Brainstorming the core idea of a multi-provider AI study companion
-- **Feature Specification**: Defining the 5 core tools (Summarize, Flashcards, Quiz, Mind Map, Data Extractor)
-- **User Experience Design**: Planning the workflow and user interactions
-- **Technical Requirements**: Identifying security needs, export formats, and performance considerations
-- **Prompt Engineering**: Designing the structured prompts for each AI tool
+**Purpose**: Ideation, Feature Planning, and System Design
+- **Concept Generation**: Helped generate the original idea and overall concept of the multi-provider AI study platform
+- **Tool Definition**: Assisted in defining the core tools (Summarizer, Flashcards, Quiz, Mind Map, Data Extractor)
+- **UX & Workflow Design**: Supported UX planning, workflow design, and prompt engineering
+- **Architecture**: Provided architectural guidance and improvement suggestions
 
 #### DeepSeek
-**Purpose**: Code Generation and Implementation
-- **File Structure Planning**: Creating the complete project hierarchy and architecture
-- **Component Implementation**: Generating the React components with Tailwind CSS
-- **Service Layer Code**: Writing the AI provider integrations and utility functions
-- **Security Implementation**: Creating encryption, validation, and rate limiting systems
-- **Documentation**: Helping structure this comprehensive README and technical documentation
+**Purpose**: Project Scaffolding & Code Implementation
+- **Architecture & Scaffolding**: Generated the project’s file structure and overall architecture
+- **Component Implementation**: Implemented React components and Tailwind styling
+- **Service Layer Code**: Wrote service-layer code including AI integrations and utilities
+- **Security Foundations**: Helped build validation, rate-limiting, and security foundations
+- **Documentation**: Assisted with structuring the documentation and README
 
-### How AI Was Used Responsibly
+#### Gemini (Google AI)
+**Purpose**: Debugging & Problem Solving
+- **Bug Fixes**: Identified logic issues and fixed component-level bugs
+- **Performance & Stability**: Helped improve performance and stability
+- **Error Analysis**: Assisted with clarifying tricky errors and edge cases
 
-#### Human Oversight and Quality Control
-- **Code Review**: All AI-generated code was thoroughly reviewed, tested, and refined
-- **Architecture Validation**: The overall system design was validated against best practices
-- **Security Auditing**: All security implementations were manually verified
-- **Integration Testing**: Each component was tested for functionality and performance
-
-#### Ethical Considerations
-- **Transparency**: Clear disclosure of AI tool usage in the development process
-- **Data Privacy**: Designed with privacy-first principles - no user data stored
-- **Academic Integrity**: Tools are designed to enhance learning, not replace it
-- **Accessibility**: Ensured the application is usable by diverse learners
-
-#### Innovation Balance
-- **AI Acceleration**: Used AI to handle repetitive coding patterns and boilerplate
-- **Human Creativity**: Reserved complex logic, security, and UX decisions for human judgment
-- **Quality Assurance**: Maintained high standards through manual code review and testing
-
-### Development Workflow
-1. **Ideation Phase** (ChatGPT): Concept development and feature planning
-2. **Architecture Phase** (DeepSeek): File structure and component planning
-3. **Implementation Phase**: Hybrid approach with AI-generated code and manual refinement
-4. **Testing Phase**: Comprehensive manual testing and bug fixes
-5. **Documentation Phase**: AI-assisted documentation with human refinement
-
-This project demonstrates how AI tools can accelerate development while maintaining high quality standards through proper oversight and ethical considerations.
-
-## 🚀 Performance Metrics
-
-- **⚡ Load Time**: < 2 seconds (Lighthouse Score: 95+)
-- **📱 Bundle Size**: < 500KB gzipped (Vite optimized)
-- **🎯 First Contentful Paint**: < 1.5s
-- **🔧 Core Web Vitals**: All green (LCP, FID, CLS)
-- **📊 Memory Usage**: < 50MB typical
-- **🔗 API Response**: < 3 seconds average
-
-## 🔮 Future Roadmap
-
-### Short Term (Next Release)
-- [ ] PWA offline support with service workers
-- [ ] Voice note integration and audio processing
-- [ ] Collaborative study rooms and sharing
-- [ ] Advanced quiz types (matching, fill-in-blank)
-- [ ] Custom model fine-tuning interface
-
-### Medium Term (3-6 Months)
-- [ ] Mobile app versions (React Native)
-- [ ] Integration with popular LMS (Canvas, Moodle)
-- [ ] Advanced analytics and progress tracking
-- [ ] Plugin system for custom tools
-- [ ] Multi-language content processing
-
-### Long Term Vision
-- [ ] AI tutoring system with adaptive learning
-- [ ] Research paper analysis and citation tools
-- [ ] Integration with academic databases
-- [ ] Peer-to-peer study group features
-- [ ] AR/VR study environments
-
-## 👥 Contributing
-
-We welcome contributions from the community! Here's how you can help:
-
-### Development Setup
-```bash
-# Fork and clone the repository
-git clone https://github.com/your-username/ai-study-companion
-cd ai-study-companion
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Run tests
-npm test
-
-# Build for production
-npm run build
-```
-
-### Contribution Guidelines
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/AmazingFeature`)
-3. **Commit** your changes (`git commit -m 'Add AmazingFeature'`)
-4. **Push** to the branch (`git push origin feature/AmazingFeature`)
-5. **Open** a Pull Request
-
-### Areas for Contribution
-- New AI provider integrations
-- Additional export formats
-- Enhanced security features
-- Performance optimizations
-- Documentation improvements
-- Translation and localization
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🎉 Acknowledgments
-
-- **AI Provider APIs** for their generous free tiers and developer support
-- **Vite Team** for the amazing build tool and development experience
-- **Tailwind CSS** for the utility-first approach that accelerated development
-- **React Community** for the extensive ecosystem and best practices
-- **Hackathon Organizers** for the opportunity to build and showcase this project
-- **Open Source Community** for the incredible tools and libraries that made this possible
 
 
 **Built with ❤️ and AI assistance during an intense hackathon development session!**
 
-*Star ⭐ this repo if you find it helpful for your learning journey!*
 
 </div>
