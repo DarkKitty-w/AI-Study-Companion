@@ -1,4 +1,3 @@
-/* src/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,23 +5,72 @@
 @layer base {
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    @apply text-gray-800 bg-gray-50;
+  }
+
+  /* Dark theme styles */
+  .dark body {
+    @apply text-gray-200 bg-gray-900;
+  }
+
+  .dark .card {
+    @apply bg-gray-800 border-gray-700;
+  }
+
+  .dark .input-field {
+    @apply bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-400 focus:border-gray-500 focus:ring-gray-500;
+  }
+
+  .dark .btn-primary {
+    @apply bg-gray-700 hover:bg-gray-600 text-white;
+  }
+
+  .dark .btn-secondary {
+    @apply bg-gray-800 hover:bg-gray-700 text-gray-200 border-gray-600;
+  }
+
+  .dark .tool-card {
+    @apply bg-gray-800 border-gray-700 hover:border-gray-600;
+  }
+
+  .dark .tool-card-active {
+    @apply border-gray-600 bg-gray-700;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-gray-800 hover:bg-gray-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
   }
   
   .btn-secondary {
-    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-white hover:bg-gray-50 text-gray-700 font-medium py-2.5 px-4 rounded-lg border border-gray-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
   }
   
   .input-field {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-white text-gray-900 placeholder-gray-500;
   }
   
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+    @apply bg-white rounded-lg border border-gray-200 shadow-sm p-6;
+  }
+  
+  .tool-card {
+    @apply w-full text-left p-4 rounded-lg border border-gray-200 hover:border-gray-300 bg-white hover:shadow-sm transition-all duration-200;
+  }
+  
+  .tool-card-active {
+    @apply border-gray-400 bg-gray-50 shadow-sm;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 }

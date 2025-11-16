@@ -1,6 +1,6 @@
 // src/components/tools/MindMapTool.jsx
 import React, { useState } from 'react';
-import { Download, Copy, MindMap, RotateCcw, Expand, Minus, Plus } from 'lucide-react';
+import { Download, Copy, Layers, RotateCcw, Expand, Minus, Plus } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useApiKeys } from '../../hooks/useApiKeys';
 import { handleExport } from '../../services/exporters';
@@ -247,7 +247,7 @@ const MindMapTool = () => {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
-            <MindMap className="h-5 w-5 text-orange-500" />
+            <Layers className="h-5 w-5 text-orange-500" />
             <span>Generate Mind Map</span>
           </h2>
           {state.inputText && (
@@ -288,7 +288,7 @@ Example: 'Machine learning encompasses several types: supervised learning (class
             disabled={state.isLoading || !state.inputText.trim()}
             className="btn-primary w-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <MindMap className="h-4 w-4 mr-2" />
+            <Layers className="h-4 w-4 mr-2" />
             {state.isLoading ? 'Generating Mind Map...' : 'Generate Mind Map'}
           </button>
         </div>
@@ -299,7 +299,7 @@ Example: 'Machine learning encompasses several types: supervised learning (class
         <div className="card animate-fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
             <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
-              <MindMap className="h-5 w-5 text-orange-500" />
+              <Layers className="h-5 w-5 text-orange-500" />
               <span>Generated Mind Map</span>
             </h2>
             <div className="flex items-center space-x-2">
@@ -384,7 +384,7 @@ Example: 'Machine learning encompasses several types: supervised learning (class
       {/* Empty State */}
       {!state.output && !state.isLoading && (
         <div className="card text-center py-12">
-          <MindMap className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <Layers className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Visualize Your Knowledge</h3>
           <p className="text-gray-600 max-w-md mx-auto">
             Enter your study materials above to generate an interactive mind map that shows relationships between concepts and ideas.

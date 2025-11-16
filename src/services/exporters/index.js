@@ -1,4 +1,3 @@
-// src/services/exporters/index.js
 import jsPDF from 'jspdf';
 
 export const exportAsText = (content, filename = 'study-companion-export') => {

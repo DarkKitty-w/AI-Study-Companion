@@ -1,6 +1,6 @@
 // src/components/tools/FlashcardsTool.jsx
 import React, { useState } from 'react';
-import { Download, Copy, Cards, RotateCcw, Shuffle, CheckCircle } from 'lucide-react';
+import { Download, Copy, Layout, RotateCcw, Shuffle, CheckCircle } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useApiKeys } from '../../hooks/useApiKeys';
 import { handleExport } from '../../services/exporters';
@@ -189,7 +189,7 @@ const FlashcardsTool = () => {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
-            <Cards className="h-5 w-5 text-green-500" />
+            <Layout className="h-5 w-5 text-green-500" />
             <span>Generate Flashcards</span>
           </h2>
           {state.inputText && (
@@ -248,7 +248,7 @@ Example: 'Photosynthesis is the process used by plants to convert sunlight into 
             disabled={state.isLoading || !state.inputText.trim()}
             className="btn-primary w-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Cards className="h-4 w-4 mr-2" />
+            <Layout className="h-4 w-4 mr-2" />
             {state.isLoading ? 'Generating Flashcards...' : 'Generate Flashcards'}
           </button>
         </div>
@@ -340,7 +340,7 @@ Example: 'Photosynthesis is the process used by plants to convert sunlight into 
         <div className="card animate-fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
             <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
-              <Cards className="h-5 w-5 text-green-500" />
+              <Layout className="h-5 w-5 text-green-500" />
               <span>Generated Flashcards ({state.output.flashcards.length} cards)</span>
             </h2>
             <div className="flex items-center space-x-2">
@@ -416,7 +416,7 @@ Example: 'Photosynthesis is the process used by plants to convert sunlight into 
       {/* Empty State */}
       {!state.output && !state.isLoading && (
         <div className="card text-center py-12">
-          <Cards className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <Layout className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Ready for Flashcards</h3>
           <p className="text-gray-600 max-w-md mx-auto">
             Enter your study materials above to generate interactive Q&A flashcards. Perfect for active recall practice!

@@ -1,13 +1,13 @@
 // src/components/layout/ToolSelector.jsx
 import React from 'react';
-import { FileText, Cards, HelpCircle, MindMap, Database, Sparkles } from 'lucide-react';
+import { FileText, SquareStack, HelpCircle, GitBranch, Database, Sparkles } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 
 const TOOLS = [
   {
     id: 'summarize',
     name: 'Summarize',
-    description: 'Convert long notes into concise bullet points',
+    description: 'Convert notes to concise bullet points',
     icon: FileText,
     color: 'from-blue-500 to-cyan-500',
     badge: 'Quick'
@@ -15,8 +15,8 @@ const TOOLS = [
   {
     id: 'flashcards',
     name: 'Flashcards',
-    description: 'Generate Q&A flashcards in JSON format',
-    icon: Cards,
+    description: 'Generate Q&A flashcards',
+    icon: SquareStack,
     color: 'from-green-500 to-emerald-500',
     badge: 'Study'
   },
@@ -31,8 +31,8 @@ const TOOLS = [
   {
     id: 'mindmap',
     name: 'Mind Map',
-    description: 'Generate hierarchical mind maps',
-    icon: MindMap,
+    description: 'Visualize concepts hierarchically',
+    icon: GitBranch,
     color: 'from-orange-500 to-red-500',
     badge: 'Visual'
   },
@@ -53,7 +53,7 @@ const ToolSelector = () => {
     <div className="card">
       <div className="flex items-center space-x-2 mb-6">
         <Sparkles className="h-5 w-5 text-purple-500" />
-        <h2 className="text-xl font-bold text-gray-900">Study Tools</h2>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-200">Study Tools</h2>
       </div>
       
       <div className="space-y-3">
@@ -64,7 +64,7 @@ const ToolSelector = () => {
             className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 group hover:shadow-md ${
               state.currentTool === tool.id
                 ? `border-gray-300 bg-gradient-to-r ${tool.color} bg-opacity-5 shadow-sm`
-                : 'border-gray-200 hover:border-gray-300 bg-white'
+                : 'border-gray-200 hover:border-gray-300 bg-white dark:bg-gray-700'
             }`}
           >
             <div className="flex items-start space-x-4">
@@ -74,7 +74,7 @@ const ToolSelector = () => {
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2 mb-1">
-                  <h3 className={`font-semibold text-gray-900 group-hover:text-gray-800 ${
+                  <h3 className={`font-semibold text-gray-900 dark:text-gray-200 group-hover:text-gray-800 ${
                     state.currentTool === tool.id ? `text-transparent bg-gradient-to-r ${tool.color} bg-clip-text` : ''
                   }`}>
                     {tool.name}
@@ -83,7 +83,9 @@ const ToolSelector = () => {
                     {tool.badge}
                   </span>
                 </div>
-                <p className="text-sm text-gray-600 leading-relaxed">{tool.description}</p>
+                {state.interfacePreferences.showToolDescriptions && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{tool.description}</p>
+                )}
               </div>
               
               {state.currentTool === tool.id && (
@@ -94,13 +96,14 @@ const ToolSelector = () => {
         ))}
       </div>
 
-      {/* Usage Tips */}
-      <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <h3 className="text-sm font-medium text-blue-900 mb-2">💡 Pro Tip</h3>
-        <p className="text-xs text-blue-700">
-          Start with "Summarize" for quick overviews, then use "Flashcards" and "Quiz" for active recall practice.
-        </p>
-      </div>
+      {state.interfacePreferences.showToolDescriptions && (
+        <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <h3 className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">💡 Pro Tip</h3>
+          <p className="text-xs text-blue-700 dark:text-blue-400">
+            Start with "Summarize" for quick overviews, then use "Flashcards" and "Quiz" for active recall practice.
+          </p>
+        </div>
+      )}
     </div>
   );
 };
